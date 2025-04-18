@@ -20,7 +20,7 @@ export default async function Home() {
         </CardHeader>
         <CardContent>
           <TypographyP className="text-lg text-gray-600 ">
-            I’m building this project to teach you the secrets of{" "}
+            I&#39;m building this project to teach you the secrets of{" "}
             <Link
               target="_blank"
               href="https://www.better-auth.com/"

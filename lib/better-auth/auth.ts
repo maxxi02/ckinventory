@@ -24,7 +24,7 @@ export const auth = betterAuth({
     sendResetPassword: async ({ user, url }) => {
       await resend.emails.send({
         from:
-          process.env.NODE_ENV === "production"
+          process.env.APP_ENV === "production"
             ? SENDER_EMAIL
             : SENDER_EMAIL_DEV,
         to: user.email,
@@ -45,7 +45,7 @@ export const auth = betterAuth({
     sendVerificationEmail: async ({ user, url }) => {
       await resend.emails.send({
         from:
-          process.env.NODE_ENV === "production"
+          process.env.APP_ENV === "production"
             ? SENDER_EMAIL
             : SENDER_EMAIL_DEV,
         to: user.email,
@@ -60,7 +60,7 @@ export const auth = betterAuth({
       sendDeleteAccountVerification: async ({ user, url }) => {
         const { error } = await resend.emails.send({
           from:
-            process.env.NODE_ENV === "production"
+            process.env.APP_ENV === "production"
               ? SENDER_EMAIL
               : SENDER_EMAIL_DEV,
           to: user.email,
@@ -78,7 +78,7 @@ export const auth = betterAuth({
       sendChangeEmailVerification: async ({ user, url }) => {
         const { error } = await resend.emails.send({
           from:
-            process.env.NODE_ENV === "production"
+            process.env.APP_ENV === "production"
               ? SENDER_EMAIL
               : SENDER_EMAIL_DEV,
           to: user.email,
@@ -100,7 +100,7 @@ export const auth = betterAuth({
         async sendOTP({ user, otp }) {
           const { error } = await resend.emails.send({
             from:
-              process.env.NODE_ENV === "production"
+              process.env.APP_ENV === "production"
                 ? SENDER_EMAIL
                 : SENDER_EMAIL_DEV,
             to: user.email,

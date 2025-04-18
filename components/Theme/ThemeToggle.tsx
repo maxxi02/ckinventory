@@ -8,6 +8,12 @@ import { TypographyP } from "../ui/typhography";
 
 export function ModeToggle() {
   const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = React.useState(false);
+
+  // Only execute on client, after hydration
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleToggle = (checked: boolean) => {
     setTheme(checked ? "dark" : "light");
@@ -22,12 +28,20 @@ export function ModeToggle() {
         <TypographyP>Theme:</TypographyP>
         <div className="flex items-center justify-between gap-2">
           <p>Toggle to dark mode</p>
-          <Switch
-            className="cursor-pointer"
-            checked={theme === "dark"}
-            onCheckedChange={handleToggle}
-            aria-label="Toggle theme"
-          />
+          {mounted ? (
+            <Switch
+              className="cursor-pointer"
+              checked={theme === "dark"}
+              onCheckedChange={handleToggle}
+              aria-label="Toggle theme"
+            />
+          ) : (
+            <Switch
+              className="cursor-pointer"
+              checked={false}
+              aria-label="Toggle theme"
+            />
+          )}
         </div>
       </CardContent>
     </Card>
