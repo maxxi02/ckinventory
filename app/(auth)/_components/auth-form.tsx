@@ -209,7 +209,7 @@ export function SigninForm() {
   }
   return (
     <>
-      <div className="w-md">
+      <div className="w-md z-50">
         <Card>
           <CardHeader>
             <CardTitle className="text-xl">Signin</CardTitle>
@@ -355,7 +355,7 @@ export function ForgotPassword({
   }
   return (
     <Dialog open={isForgetClick} onOpenChange={setIsForgetClick}>
-      <DialogContent>
+      <DialogContent className="z-100">
         <DialogHeader className="text-start space-y-1">
           <DialogTitle>Password Reset Request</DialogTitle>
           <p className="text-sm opacity-50">
