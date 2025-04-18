@@ -1,16 +1,15 @@
 "use client";
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { authClient } from "@/lib/better-auth/auth-client";
-import { LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 import React from "react";
 import toast from "react-hot-toast";
+import { MdLogout } from "react-icons/md";
 
 const SignoutItem = () => {
   const router = useRouter();
   return (
-    <DropdownMenuItem
-      className="flex items-center justify-between gap-3"
+    <button
+      className="flex items-center justify-between gap-2"
       onClick={async () => {
         await authClient.signOut({
           fetchOptions: {
@@ -26,9 +25,9 @@ const SignoutItem = () => {
         });
       }}
     >
-      Sign Out
-      <LogOut />
-    </DropdownMenuItem>
+      <MdLogout size={18}/>
+      Logout
+    </button>
   );
 };
 

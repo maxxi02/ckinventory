@@ -4,6 +4,7 @@ import { MdInventory } from "react-icons/md"; // For Products icon
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarMenu,
@@ -19,8 +20,15 @@ import {
   CollapsibleTrigger,
   CollapsibleContent,
 } from "@/components/ui/collapsible";
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import { getServerSession } from "@/lib/action";
+import SignoutItem from "@/app/(dashboard)/(user-settings)/_components/SignoutItem";
 
-export function AppSidebar() {
+export async function AppSidebar() {
+  const session = await getServerSession();
+  const profile = session?.user?.image;
+  const name = session?.user.name;
+  const email = session?.user.email;
   return (
     <Sidebar>
       <SidebarContent>
@@ -66,7 +74,15 @@ export function AppSidebar() {
                 </Collapsible>
               </SidebarMenuItem>
 
-              {/* Settings item */}
+              {/* Logout */}
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <div>
+                    <SignoutItem />
+                  </div>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              {/* Settings */}
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
                   <Link href="/settings">
@@ -79,6 +95,27 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+      <SidebarFooter>
+        <div className="flex items-center justify-start gap-2">
+          <Avatar>
+            <AvatarImage
+              className="cursor-pointer w-10 h-10 object-cover"
+              src={profile ? profile : "https://github.com/shadcn.png"}
+            />
+            <AvatarFallback>
+              {/* MAP THE INITIALS */}
+              {name
+                ?.split(" ")
+                .map((part) => part.charAt(0).toUpperCase())
+                .join("")}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex flex-col items-start justify-start text-sm opacity-90">
+            <span>{name}</span>
+            <span>{email}</span>
+          </div>
+        </div>
+      </SidebarFooter>
     </Sidebar>
   );
 }
