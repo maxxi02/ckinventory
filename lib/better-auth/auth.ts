@@ -1,6 +1,7 @@
 import { betterAuth } from "better-auth";
 import { nextCookies } from "better-auth/next-js";
 import {
+  FRONTEND_URL,
   GOOGLE_CLIENT_ID,
   GOOGLE_CLIENT_SECRET,
   MONGODB_URL,
@@ -16,7 +17,7 @@ const client = new MongoClient(MONGODB_URL);
 const db = client.db();
 
 export const auth = betterAuth({
-  trustedOrigins: ["https://ckinventory.vercel.app/"],
+  trustedOrigins: [FRONTEND_URL],
   secret: process.env.AUTH_SECRET,
   database: mongodbAdapter(db),
   emailAndPassword: {
