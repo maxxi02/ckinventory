@@ -16,6 +16,7 @@ const client = new MongoClient(MONGODB_URL);
 const db = client.db();
 
 export const auth = betterAuth({
+  trustedOrigins: ["https://ckinventory.vercel.app/"],
   secret: process.env.AUTH_SECRET,
   database: mongodbAdapter(db),
   emailAndPassword: {
