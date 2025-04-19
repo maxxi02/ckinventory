@@ -52,22 +52,16 @@ export async function AppSidebar() {
                   <CollapsibleTrigger asChild>
                     <SidebarMenuButton>
                       <MdInventory />
-                      <span>Products</span>
+                      <span>Product Actions</span>
                     </SidebarMenuButton>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
                     <SidebarMenuSub>
                       <SidebarMenuSubItem>
-                        <Link href="/products/add">Add Product</Link>
+                        <Link href="/product/add">Add Product</Link>
                       </SidebarMenuSubItem>
                       <SidebarMenuSubItem>
-                        <Link href="/products/list">View Products</Link>
-                      </SidebarMenuSubItem>
-                      <SidebarMenuSubItem>
-                        <Link href="/products/edit">Edit Products</Link>
-                      </SidebarMenuSubItem>
-                      <SidebarMenuSubItem>
-                        <Link href="/products/delete">Delete Products</Link>
+                        <Link href="/product/view">View Product</Link>
                       </SidebarMenuSubItem>
                     </SidebarMenuSub>
                   </CollapsibleContent>

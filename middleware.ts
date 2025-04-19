@@ -35,6 +35,9 @@ export async function middleware(req: NextRequest) {
     "/profile",
     "/settings",
     "/reset-password",
+    "/product",
+    "/product/add",
+    "/product/view",
   ];
 
   // Check if the current path is a private route
