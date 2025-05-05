@@ -1,6 +1,5 @@
-import { MdDashboard } from "react-icons/md";
 import { IoMdSettings } from "react-icons/io";
-import { MdInventory } from "react-icons/md"; // For Products icon
+import { MdDashboard, MdInventory } from "react-icons/md"; // For Products icon
 import {
   Sidebar,
   SidebarContent,
@@ -23,6 +22,8 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { getServerSession } from "@/lib/action";
 import SignoutItem from "@/app/(dashboard)/(user-settings)/_components/SignoutItem";
+import { RiArchive2Fill } from "react-icons/ri";
+import { IconCategory2 } from "@tabler/icons-react";
 
 export async function AppSidebar() {
   const session = await getServerSession();
@@ -67,8 +68,25 @@ export async function AppSidebar() {
                   </CollapsibleContent>
                 </Collapsible>
               </SidebarMenuItem>
-
-              {/* Logout */}
+              {/* Categories */}
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <Link href="/category">
+                    <IconCategory2 />
+                    <span>Categories</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              {/* VIEW ARCHIVES */}
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <Link href="/product/archives">
+                    <RiArchive2Fill />
+                    <span>Archives</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              {/* LOGOUT */}
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
                   <div>

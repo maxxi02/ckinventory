@@ -149,3 +149,41 @@ body,
     @apply bg-background text-foreground;
   }
 }
+
+/* Make the scanner UI more compact */
+#barcode-scanner-container {
+  position: relative;
+  min-height: 300px;
+  max-height: 400px;
+  overflow: hidden;
+}
+
+#barcode-scanner-container video {
+  max-height: 320px !important;
+  object-fit: cover !important;
+  width: 100% !important;
+}
+
+#barcode-scanner-container button {
+  margin: 3px !important;
+  padding: 4px 8px !important;
+  font-size: 12px !important;
+}
+
+#barcode-scanner-container select {
+  padding: 4px !important;
+  height: auto !important;
+  font-size: 12px !important;
+}
+
+#barcode-scanner-container section div {
+  margin-bottom: 8px !important;
+}
+
+#barcode-scanner-container section {
+  padding: 8px !important;
+}
+
+#barcode-scanner-container section > div:nth-child(3) {
+  display: none !important;
+}
