@@ -2,9 +2,6 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -33,11 +30,14 @@ import {
 } from "@/components/ui/form";
 import Image from "next/image";
 import toast from "react-hot-toast";
-import { Loader2, Barcode, Camera, ScanLine, XCircle } from "lucide-react";
-import BarcodeScanner from "@/lib/barcodeScanner";
-import ObjectDetector, { DetectedObject } from "@/lib/objectDetector";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+import { Loader2, Barcode, XCircle, Camera } from "lucide-react";
+import BarcodeScanner from "@/lib/barcodescanner-utilities/barcode-scanner";
+import ObjectDetector, {
+  DetectedObject,
+} from "@/lib/objectdetector-utilities/object-detector";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 
 interface Category {
   _id: string;
@@ -81,11 +81,10 @@ export default function AddProductPage() {
 
   // Object detector states
   const [isDetectorActive, setDetectorActive] = useState(false);
-  const [isDetectorLoading, setDetectorLoading] = useState(false);
-  const detectorRef = useRef<ObjectDetector | null>(null);
-  const detectorDivId = "object-detector";
-  const [detectedObjects, setDetectedObjects] = useState<DetectedObject[]>([]);
-  const [selectedObject, setSelectedObject] = useState<string | null>(null);
+  const autoCloseEnabled = true;
+  const [lastDetectedObject, setLastDetectedObject] = useState<string | null>(
+    null
+  );
 
   const form = useForm<z.infer<typeof productSchema>>({
     resolver: zodResolver(productSchema),
@@ -165,30 +164,11 @@ export default function AddProductPage() {
     }
   };
 
-  // Handle successful object detection
-  const handleDetectionSuccess = (objects: DetectedObject[]) => {
-    if (objects.length > 0) {
-      setDetectedObjects(objects);
-
-      // Auto-select the highest confidence object
-      const highestConfidenceObject = [...objects].sort(
-        (a, b) => b.score - a.score
-      )[0];
-      selectObject(highestConfidenceObject.className);
-
-      // Auto-close the detector after successful detection
-      if (detectorRef.current && detectorRef.current.isDetecting()) {
-        stopDetector();
-        toast.success(`Detected: ${highestConfidenceObject.className}`);
-      }
-    }
-  };
-
   // Start barcode scanner
   const startScanner = async () => {
     // Make sure to stop object detector if running
     if (isDetectorActive) {
-      stopDetector();
+      setDetectorActive(false);
     }
 
     setIsScannerLoading(true);
@@ -229,108 +209,40 @@ export default function AddProductPage() {
     setScannerActive(false);
   };
 
-  // Start object detector
-  const startDetector = async () => {
-    // Make sure to stop barcode scanner if running
+  // Handle object detection results
+  const handleObjectDetection = (objects: DetectedObject[]) => {
+    if (objects && objects.length > 0) {
+      // Sort by confidence score and take the highest one
+      const sortedObjects = [...objects].sort((a, b) => b.score - a.score);
+      const topObject = sortedObjects[0];
+
+      console.log("Detected object:", topObject.className);
+      setLastDetectedObject(topObject.className);
+
+      // Update form with detected object
+      form.setValue("detectedObject", topObject.className);
+
+      // If product name is empty, use the detected object name
+      if (!form.getValues("productName")) {
+        form.setValue(
+          "productName",
+          topObject.className.charAt(0).toUpperCase() +
+            topObject.className.slice(1)
+        );
+      }
+
+      toast.success(`Detected: ${topObject.className}`);
+    }
+  };
+
+  // Toggle object detector
+  const toggleObjectDetector = () => {
+    // Make sure to stop scanner if active
     if (isScannerActive) {
       stopScanner();
     }
 
-    setDetectorLoading(true);
-    if (!detectorRef.current) {
-      detectorRef.current = new ObjectDetector(detectorDivId, {
-        onDetectionSuccess: handleDetectionSuccess,
-        onDetectorClosed: () => setDetectorActive(false),
-        onDetectionError: (error) => {
-          toast.error(`Detection error: ${error}`);
-        },
-        confidenceThreshold: 0.6,
-        autoCloseOnDetection: false, // We'll handle auto-close in the callback
-      });
-    }
-
-    try {
-      const started = await detectorRef.current.start();
-      if (started) {
-        setDetectorActive(true);
-        setDetectedObjects([]);
-        setSelectedObject(null);
-        form.setValue("detectedObject", "");
-      } else {
-        toast.error("Failed to start object detector");
-      }
-    } catch (error) {
-      console.error("Detector start error:", error);
-      toast.error("Failed to start object detector");
-    } finally {
-      setDetectorLoading(false);
-    }
-  };
-
-  // Stop object detector
-  const stopDetector = () => {
-    if (detectorRef.current) {
-      detectorRef.current.stop();
-    }
-    setDetectorActive(false);
-  };
-
-  // Capture current detection
-  const captureDetection = async () => {
-    if (!detectorRef.current || !detectorRef.current.isDetecting()) {
-      toast.error("Object detector is not active");
-      return;
-    }
-
-    try {
-      const objects = await detectorRef.current.captureDetection();
-      if (objects.length > 0) {
-        // Sort by confidence score
-        const sortedObjects = [...objects].sort((a, b) => b.score - a.score);
-        setDetectedObjects(sortedObjects);
-
-        // Select the highest confidence object
-        selectObject(sortedObjects[0].className);
-
-        // Auto-populate the product name if not already set
-        if (!form.getValues("productName")) {
-          form.setValue("productName", sortedObjects[0].className);
-        }
-
-        toast.success(`Detected ${sortedObjects.length} objects`);
-
-        // Auto close detector after successful capture
-        stopDetector();
-      } else {
-        toast.error("No objects detected");
-      }
-    } catch (error) {
-      console.error("Capture error:", error);
-      toast.error("Failed to capture detection");
-    }
-  };
-
-  // Select detected object
-  const selectObject = (objectName: string) => {
-    setSelectedObject(objectName);
-    form.setValue("detectedObject", objectName);
-
-    // Set the object name as product name if not already set
-    if (!form.getValues("productName")) {
-      form.setValue("productName", objectName);
-    }
-
-    // Try to find a matching category
-    const lowercaseObject = objectName.toLowerCase();
-    const matchingCategory = categories.find(
-      (cat) =>
-        cat.name.toLowerCase().includes(lowercaseObject) ||
-        lowercaseObject.includes(cat.name.toLowerCase())
-    );
-
-    if (matchingCategory && !form.getValues("category")) {
-      form.setValue("category", matchingCategory._id);
-    }
+    setDetectorActive(!isDetectorActive);
   };
 
   // Handle form submission
@@ -402,21 +314,9 @@ export default function AddProductPage() {
     }
   };
 
-  // Clean up on component unmount
-  useEffect(() => {
-    return () => {
-      if (scannerRef.current) {
-        scannerRef.current.stop();
-      }
-      if (detectorRef.current) {
-        detectorRef.current.stop();
-      }
-    };
-  }, []);
-
   return (
-    <div className="container mx-auto overflow-hidden pb-6">
-      <Card className="flex-1">
+    <div className="container mx-auto py-6">
+      <Card>
         <CardHeader>
           <CardTitle>Add New Product</CardTitle>
           <CardDescription>
@@ -427,9 +327,9 @@ export default function AddProductPage() {
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <div className="flex flex-col lg:flex-row gap-6">
-                <div className="flex-grow space-y-6">
-                  {/* Smart Tools Section */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Smart Tools and Detection Section */}
+                <div className="space-y-6">
                   <div className="bg-muted p-4 rounded-md">
                     <div className="text-lg font-medium mb-2">
                       Smart Product Tools
@@ -453,41 +353,21 @@ export default function AddProductPage() {
                       <Button
                         type="button"
                         variant={isDetectorActive ? "destructive" : "outline"}
-                        onClick={
-                          isDetectorActive ? stopDetector : startDetector
-                        }
-                        disabled={isDetectorLoading || isScannerActive}
+                        onClick={toggleObjectDetector}
+                        disabled={isScannerActive}
                         className="flex items-center"
                       >
-                        {isDetectorLoading ? (
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        ) : (
-                          <Camera size={16} className="mr-2" />
-                        )}
+                        <Camera size={16} className="mr-2" />
                         {isDetectorActive ? "Stop Detector" : "Detect Object"}
                       </Button>
-
-                      {isDetectorActive && (
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          onClick={captureDetection}
-                          className="flex items-center"
-                        >
-                          <ScanLine size={16} className="mr-2" />
-                          Capture Current View
-                        </Button>
-                      )}
                     </div>
                   </div>
 
-                  {/* Scanner/Detector Container */}
-                  <div className="relative">
+                  {/* Scanner/Detector View Area */}
+                  <div className="h-auto border rounded-md overflow-hidden">
                     {/* Barcode Scanner */}
                     <div
-                      className={`${
-                        isScannerActive ? "block" : "hidden"
-                      } relative h-[800px] w-full max-w-3xl mx-auto overflow-hidden border rounded-md aspect-video`}
+                      className={` ${isScannerActive ? "relative" : "hidden"} w-full h-full`}
                     >
                       <div className="absolute top-0 left-0 right-0 bg-black bg-opacity-50 p-2 flex justify-between items-center z-10">
                         <p className="text-sm font-medium text-white">
@@ -506,66 +386,69 @@ export default function AddProductPage() {
                     </div>
 
                     {/* Object Detector */}
-                    <div
-                      className={`${
-                        isDetectorActive ? "block" : "hidden"
-                      } relative h-[500px] w-full max-w-3xl mx-auto overflow-hidden border rounded-md aspect-video`}
-                    >
-                      <div className="absolute top-0 left-0 right-0 bg-black bg-opacity-50 p-2 flex justify-between items-center z-10">
-                        <p className="text-sm font-medium text-white">
-                          Object Detector
+                    {isDetectorActive && (
+                      <ObjectDetector
+                        isActive={isDetectorActive}
+                        onActivationChange={setDetectorActive}
+                        onDetection={handleObjectDetection}
+                        autoCapture={autoCloseEnabled}
+                        captureThreshold={0.7}
+                      />
+                    )}
+
+                    {/* Default prompt when no tool active */}
+                    {!isScannerActive && !isDetectorActive && (
+                      <div className="flex flex-col items-center justify-center h-full bg-muted py-2">
+                        <p className="text-sm text-muted-foreground mb-2">
+                          Use the smart tools above to scan a barcode or detect
+                          an object
                         </p>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={stopDetector}
-                          className="h-7 px-2 text-xs text-white hover:bg-black hover:bg-opacity-30"
-                        >
-                          <XCircle size={16} />
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={startScanner}
+                            className="flex items-center"
+                          >
+                            <Barcode size={16} className="mr-2" />
+                            Scan Barcode
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={toggleObjectDetector}
+                            className="flex items-center"
+                          >
+                            <Camera size={16} className="mr-2" />
+                            Detect Object
+                          </Button>
+                        </div>
                       </div>
-                      <div id={detectorDivId} className="w-full h-full"></div>
-                    </div>
+                    )}
                   </div>
 
                   {/* Detection Results */}
-                  {detectedObjects.length > 0 && (
-                    <div className="p-3 bg-muted rounded-md">
-                      <div className="font-medium mb-2">Detected Objects:</div>
-                      <div className="flex flex-wrap gap-2">
-                        {detectedObjects.map((obj, index) => (
-                          <Badge
-                            key={`${obj.className}-${index}`}
-                            variant={
-                              selectedObject === obj.className
-                                ? "default"
-                                : "outline"
-                            }
-                            className="cursor-pointer"
-                            onClick={() => selectObject(obj.className)}
-                          >
-                            {obj.className}{" "}
-                            <span className="text-xs ml-1">
-                              {Math.round(obj.score * 100)}%
-                            </span>
-                          </Badge>
-                        ))}
+                  <div className="grid grid-cols-1 gap-4">
+                    {lastScannedBarcode && (
+                      <div className="p-3 bg-muted rounded-md">
+                        <p className="text-sm font-medium">
+                          Scanned Barcode: {lastScannedBarcode}
+                        </p>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {/* Barcode Results */}
-                  {lastScannedBarcode && (
-                    <div className="p-3 bg-muted rounded-md">
-                      <p className="text-sm font-medium">
-                        Barcode: {lastScannedBarcode}
-                      </p>
-                    </div>
-                  )}
+                    {lastDetectedObject && (
+                      <div className="p-3 bg-muted rounded-md">
+                        <p className="text-sm font-medium">
+                          Detected Object: {lastDetectedObject}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
 
-                  <Separator />
-
-                  {/* Product Information Form */}
+                {/* Product Form Section */}
+                <div className="space-y-5">
                   <div className="text-lg font-medium mb-2">
                     Product Information
                   </div>
@@ -624,7 +507,7 @@ export default function AddProductPage() {
                     )}
                   />
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
                       name="quantity"
@@ -665,7 +548,7 @@ export default function AddProductPage() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
                       name="rate"

@@ -1,4 +1,4 @@
-// lib/barcodeScanner.ts
+// lib/barcodescanner-utilities/barcodeScanner.ts
 import { Html5QrcodeScanner, Html5QrcodeCameraScanConfig } from "html5-qrcode";
 import toast from "react-hot-toast";
 
