@@ -2,18 +2,16 @@
 
 import { useEffect, useRef, useState } from "react";
 import * as tf from "@tensorflow/tfjs";
-import * as cocossd from "@tensorflow-models/coco-ssd";
 import Webcam from "react-webcam";
-import { drawRect } from "@/lib/objectdetector-utilities/utilities";
 import { Button } from "@/components/ui/button";
 import { XCircle, Loader2, Camera } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import * as tmImage from "@teachablemachine/image";
 
 export interface DetectedObject {
   className: string;
   score: number;
-  bbox: [number, number, number, number];
 }
 
 interface ObjectDetectorProps {
@@ -22,18 +20,21 @@ interface ObjectDetectorProps {
   onActivationChange: (active: boolean) => void;
   autoCapture?: boolean;
   captureThreshold?: number;
+  confidenceThreshold?: number;
+  modelUrl?: string;
 }
 
 const ObjectDetector = ({
   onDetection,
   isActive,
   onActivationChange,
-  autoCapture = false,
+  autoCapture,
   captureThreshold = 0.7,
+  confidenceThreshold = 0.1, // New threshold to filter out very low confidence predictions
+  modelUrl = "/teachableModels/",
 }: ObjectDetectorProps) => {
   const webcamRef = useRef<Webcam>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [model, setModel] = useState<cocossd.ObjectDetection | null>(null);
+  const [model, setModel] = useState<tmImage.CustomMobileNet | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [detectedObjects, setDetectedObjects] = useState<DetectedObject[]>([]);
   const detectionRef = useRef<NodeJS.Timeout | null>(null);
@@ -44,19 +45,19 @@ const ObjectDetector = ({
     const loadModel = async () => {
       try {
         await tf.ready();
-        await tf.setBackend("webgl");
-        console.log("Using tensorflow backend:", tf.getBackend());
-
         setIsLoading(true);
-        const loadedModel = await cocossd.load();
+
+        const loadedModel = await tmImage.load(
+          `${modelUrl}model.json`,
+          `${modelUrl}metadata.json`
+        );
+
         setModel(loadedModel);
         setIsLoading(false);
-
-        console.log("Object detection model loaded successfully");
       } catch (error) {
         console.error("Error loading model:", error);
         setIsLoading(false);
-        onActivationChange(false); // Disable detection on error
+        onActivationChange(false);
       }
     };
 
@@ -70,7 +71,7 @@ const ObjectDetector = ({
         detectionRef.current = null;
       }
     };
-  }, [isActive, onActivationChange]);
+  }, [isActive, onActivationChange, modelUrl]);
 
   // Run object detection
   useEffect(() => {
@@ -84,18 +85,23 @@ const ObjectDetector = ({
       detectionRef.current = setInterval(async () => {
         const detections = await detect();
         if (detections && detections.length > 0) {
-          setDetectedObjects(detections);
+          // Filter detections based on confidence threshold
+          const filteredDetections = detections
+            .filter((obj) => obj.score >= confidenceThreshold)
+            .sort((a, b) => b.score - a.score);
 
-          // Auto-capture if enabled and we have high confidence detections
-          if (autoCloseEnabled) {
-            const highConfidenceDetection = detections.find(
-              (obj) => obj.score >= captureThreshold
-            );
+          if (filteredDetections.length > 0) {
+            setDetectedObjects(filteredDetections);
 
-            if (highConfidenceDetection) {
-              onDetection(detections);
-              // Stop detection after auto-capture when autoClose is enabled
-              onActivationChange(false);
+            if (autoCloseEnabled) {
+              const highConfidenceDetection = filteredDetections.find(
+                (obj) => obj.score >= captureThreshold
+              );
+
+              if (highConfidenceDetection) {
+                onDetection(filteredDetections);
+                onActivationChange(false);
+              }
             }
           }
         }
@@ -116,55 +122,24 @@ const ObjectDetector = ({
     isLoading,
     autoCloseEnabled,
     captureThreshold,
+    confidenceThreshold,
     onDetection,
     onActivationChange,
   ]);
 
-  // Update autoClose state when the prop changes
-  useEffect(() => {
-    setAutoCloseEnabled(autoCapture);
-  }, [autoCapture]);
-
   // Perform a single detection
   const detect = async (): Promise<DetectedObject[] | null> => {
-    if (!model || !webcamRef.current || !canvasRef.current) return null;
+    if (!model || !webcamRef.current) return null;
 
     const video = webcamRef.current.video;
     if (!video || video.readyState !== 4) return null;
 
-    // Get video dimensions
-    const videoWidth = video.videoWidth;
-    const videoHeight = video.videoHeight;
-
-    // Set video width and height
-    video.width = videoWidth;
-    video.height = videoHeight;
-
-    // Set canvas height and width
-    canvasRef.current.width = videoWidth;
-    canvasRef.current.height = videoHeight;
-
     try {
-      // Make detections
-      const rawDetections = await model.detect(video);
-
-      // Convert to our DetectedObject type
-      const formattedDetections: DetectedObject[] = rawDetections.map(
-        (detection) => ({
-          className: detection.class,
-          score: detection.score,
-          bbox: detection.bbox as [number, number, number, number],
-        })
-      );
-
-      // Draw detections on canvas
-      const ctx = canvasRef.current.getContext("2d");
-      if (ctx) {
-        ctx.clearRect(0, 0, videoWidth, videoHeight);
-        drawRect(rawDetections, ctx);
-      }
-
-      return formattedDetections;
+      const predictions = await model.predict(video);
+      return predictions.map((p) => ({
+        className: p.className,
+        score: p.probability,
+      }));
     } catch (error) {
       console.error("Detection error:", error);
       return null;
@@ -211,9 +186,11 @@ const ObjectDetector = ({
   }
 
   return (
-    <div className="relative w-full h-[600px] overflow-hidden border rounded-md">
+    <div className="relative w-full h-[400px] overflow-hidden border rounded-md">
       <div className="absolute top-0 left-0 right-0 bg-black bg-opacity-50 p-2 flex justify-between items-center z-20">
-        <p className="text-sm font-medium text-white">Object Detector</p>
+        <p className="text-sm font-medium text-white">
+          Teachable Machine Model
+        </p>
         <Button
           variant="ghost"
           size="sm"
@@ -229,7 +206,7 @@ const ObjectDetector = ({
           <div className="text-center">
             <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-white" />
             <p className="text-white text-sm">
-              Loading object detection model...
+              Loading Teachable Machine model...
             </p>
           </div>
         </div>
@@ -247,33 +224,40 @@ const ObjectDetector = ({
           }}
           className="absolute top-0 left-0 w-full h-full object-cover"
         />
-        <canvas
-          ref={canvasRef}
-          className="absolute top-0 left-0 w-full h-full object-cover"
-        />
       </div>
 
-      <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 p-2 flex justify-between items-center z-20">
-        <div className="flex items-center">
-          <Switch
-            id="auto-capture"
-            checked={autoCloseEnabled}
-            onCheckedChange={toggleAutoClose}
-            className="mr-2"
-          />
-          <Label htmlFor="auto-capture" className="text-xs text-white">
-            Auto Capture
-          </Label>
+      <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 p-2 flex flex-col gap-1 z-20">
+        <div className="grid grid-cols-2 gap-2">
+          {detectedObjects.map((obj, index) => (
+            <div key={index} className="text-xs text-white">
+              <span className="font-medium">{obj.className}</span>:{" "}
+              {(obj.score * 100).toFixed(2)}%
+            </div>
+          ))}
         </div>
-        <Button
-          onClick={handleCapture}
-          disabled={detectedObjects.length === 0}
-          variant="outline"
-          size="sm"
-          className="h-7 px-2 text-xs bg-white hover:bg-gray-100"
-        >
-          Capture
-        </Button>
+
+        <div className="flex justify-between items-center mt-2">
+          <div className="flex items-center">
+            <Switch
+              id="auto-capture"
+              checked={autoCloseEnabled}
+              onCheckedChange={toggleAutoClose}
+              className="mr-2"
+            />
+            <Label htmlFor="auto-capture" className="text-xs text-white">
+              Auto Capture
+            </Label>
+          </div>
+          <Button
+            onClick={handleCapture}
+            disabled={detectedObjects.length === 0}
+            variant="outline"
+            size="sm"
+            className="h-7 px-2 text-xs bg-white hover:bg-gray-100"
+          >
+            Capture
+          </Button>
+        </div>
       </div>
     </div>
   );

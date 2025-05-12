@@ -81,7 +81,7 @@ export default function AddProductPage() {
 
   // Object detector states
   const [isDetectorActive, setDetectorActive] = useState(false);
-  const autoCloseEnabled = true;
+  const autoCloseEnabled = false;
   const [lastDetectedObject, setLastDetectedObject] = useState<string | null>(
     null
   );
@@ -210,7 +210,7 @@ export default function AddProductPage() {
   };
 
   // Handle object detection results
-  const handleObjectDetection = (objects: DetectedObject[]) => {
+  const handleObjectDetection = async (objects: DetectedObject[]) => {
     if (objects && objects.length > 0) {
       // Sort by confidence score and take the highest one
       const sortedObjects = [...objects].sort((a, b) => b.score - a.score);
@@ -222,13 +222,69 @@ export default function AddProductPage() {
       // Update form with detected object
       form.setValue("detectedObject", topObject.className);
 
-      // If product name is empty, use the detected object name
-      if (!form.getValues("productName")) {
-        form.setValue(
-          "productName",
-          topObject.className.charAt(0).toUpperCase() +
-            topObject.className.slice(1)
+      try {
+        const loadingToast = toast.loading("Looking up product information...");
+        const response = await fetch(
+          `/api/products/object/${topObject.className}`
         );
+        toast.dismiss(loadingToast);
+
+        if (response.ok) {
+          const productData = await response.json();
+
+          // If product name is empty, use the detected object name or product name
+          if (!form.getValues("productName")) {
+            form.setValue(
+              "productName",
+              productData.name ||
+                topObject.className.charAt(0).toUpperCase() +
+                  topObject.className.slice(1)
+            );
+          }
+
+          // Populate other fields if available
+          if (productData.description) {
+            form.setValue("description", productData.description);
+          }
+
+          if (productData.price) {
+            form.setValue("price", productData.price);
+          }
+
+          if (productData.barcode) {
+            form.setValue("barcode", productData.barcode);
+          }
+
+          // Set category if available
+          if (productData.category) {
+            if (typeof productData.category === "string") {
+              const matchingCategory = categories.find(
+                (cat) =>
+                  cat.name.toLowerCase() === productData.category.toLowerCase()
+              );
+              if (matchingCategory) {
+                form.setValue("category", matchingCategory._id);
+              }
+            } else {
+              form.setValue("category", productData.category);
+            }
+          }
+
+          toast.success("Product information loaded successfully");
+        } else {
+          // If no product found, just use the detected object name
+          if (!form.getValues("productName")) {
+            form.setValue(
+              "productName",
+              topObject.className.charAt(0).toUpperCase() +
+                topObject.className.slice(1)
+            );
+          }
+          toast.error("No specific product information found");
+        }
+      } catch (error) {
+        console.error("Object detection product lookup error:", error);
+        toast.error("Error looking up product information");
       }
 
       toast.success(`Detected: ${topObject.className}`);
